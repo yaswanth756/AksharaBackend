@@ -9,7 +9,7 @@ import { AppError } from "../utils/appError.js";
 /* ============================================
    1. ADMIT STUDENT (The Big Transaction)
    ============================================ */
-export const admitStudent = catchAsync(async (req, res, next) => {
+   export const admitStudent = catchAsync(async (req, res, next) => {
     const session = await mongoose.startSession();
     session.startTransaction();
   
@@ -23,12 +23,11 @@ export const admitStudent = catchAsync(async (req, res, next) => {
         aadharNo,
         transferceritificateUrl,
         aadharacardUrl,
-       
   
         // Academic Details
         academicYearId,
         classId,
-        sectionId,
+        sectionId, // OPTIONAL now
   
         // Parent Details
         fatherName,
@@ -40,6 +39,11 @@ export const admitStudent = catchAsync(async (req, res, next) => {
         banckAccountPhoto,
         address,
       } = req.body;
+  
+      // -----------------------------------------------
+      // Make sectionId OPTIONAL → Convert "" to null
+      // -----------------------------------------------
+      const finalSectionId = sectionId && sectionId !== "" ? sectionId : null;
   
       // -----------------------------------------------
       // Helper: Convert DOB → Password (DDMMYYYY)
@@ -69,7 +73,7 @@ export const admitStudent = catchAsync(async (req, res, next) => {
               motherOccupation,
               address,
               banckAccountPhoto,
-              password: formatDobAsPassword(dob), // Password = DOB
+              password: formatDobAsPassword(dob),
             },
           ],
           { session }
@@ -79,7 +83,7 @@ export const admitStudent = catchAsync(async (req, res, next) => {
       }
   
       // -----------------------------------------------
-      // STEP 2: Create Student
+      // STEP 2: Create Student (SECTION OPTIONAL)
       // -----------------------------------------------
       const newStudent = await Student.create(
         [
@@ -95,7 +99,10 @@ export const admitStudent = catchAsync(async (req, res, next) => {
             parent: parent._id,
             academicYear: academicYearId,
             classLevel: classId,
-            section: sectionId,
+  
+            // section: null if not provided
+            section: finalSectionId,
+  
             status: "ACTIVE",
           },
         ],
@@ -169,6 +176,7 @@ export const admitStudent = catchAsync(async (req, res, next) => {
       session.endSession();
     }
   });
+  
   
 
 /* ============================================

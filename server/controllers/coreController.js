@@ -18,11 +18,12 @@ export const createAcademicYear = catchAsync(async (req, res, next) => {
   const year = await AcademicYear.create({ name, startDate, endDate, isCurrent });
 
   res.status(201).json({ status: "success", data: { year } });
-});
+})
 
 export const getAllYears = catchAsync(async (req, res, next) => {
   // Frontend needs this for the Dropdown!
   const years = await AcademicYear.find().sort("-startDate");
+  console.log(years);
   res.status(200).json({ status: "success", results: years.length, data: { years } });
 });
 

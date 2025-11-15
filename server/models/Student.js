@@ -21,7 +21,7 @@ const studentSchema = new mongoose.Schema(
 
     academicYear: { type: mongoose.Schema.Types.ObjectId, ref: "AcademicYear", required: true },
     classLevel: { type: mongoose.Schema.Types.ObjectId, ref: "ClassLevel", required: true },
-    section: { type: mongoose.Schema.Types.ObjectId, ref: "Section", required: true },
+    section: { type: mongoose.Schema.Types.ObjectId, ref: "Section"},
 
     status: {
       type: String,

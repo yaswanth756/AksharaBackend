@@ -11,6 +11,8 @@ import studentRouter from "./routes/studentRoutes.js";
 import teacherRouter from "./routes/teacherRoutes.js";
 import sectionRouter from "./routes/sectionRoutes.js";
 
+
+
 const app = express();
 dotenv.config();
 
@@ -46,7 +48,7 @@ app.use("/api/v1/teachers", teacherRouter);
 app.use("/api/v1/sections", sectionRouter);
 
 
-app.get('/', (req, res) => {
+app.get('/test', (req, res) => {
   res.send('Hello World!');
 });
 

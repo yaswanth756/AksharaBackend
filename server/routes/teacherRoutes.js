@@ -3,7 +3,7 @@ import {
   createTeacher, 
   getAllTeachers, 
   teacherLogin,
-  assignClassTeacher,
+
   updateTeacher,
   getTeacher
 } from "../controllers/teacherController.js";
@@ -22,7 +22,7 @@ router.get("/", getAllTeachers);
 
 // Admin/Operator only routes
 router.post("/", restrictTo("ADMIN", "OPERATOR"), createTeacher);
-router.post("/assign-class", restrictTo("ADMIN"), assignClassTeacher);
+
 
 // Update and get single teacher
 router

@@ -1,4 +1,5 @@
-// controllers/sectionController.js
+// sectionController.js
+import mongoose from 'mongoose'; // ✅ ADDED
 import Section from "../models/Section.js";
 import ClassLevel from "../models/ClassLevel.js";
 import Student from "../models/Student.js";
@@ -67,7 +68,7 @@ export const getSectionsByClass = catchAsync(async (req, res, next) => {
 });
 
 /* ============================================
-   3. GET STUDENTS IN SECTION (View List)
+   3. GET STUDENTS IN SECTION
    ============================================ */
 export const getStudentsInSection = catchAsync(async (req, res, next) => {
   const { id } = req.params;
@@ -109,7 +110,7 @@ export const getStudentsInSection = catchAsync(async (req, res, next) => {
 });
 
 /* ============================================
-   4. GET UNASSIGNED STUDENTS (For Assignment)
+   4. GET UNASSIGNED STUDENTS
    ============================================ */
 export const getUnassignedStudents = catchAsync(async (req, res, next) => {
   const { classId, search } = req.query;
@@ -269,7 +270,7 @@ export const removeStudentFromSection = catchAsync(async (req, res, next) => {
 });
 
 /* ============================================
-   8. UPDATE SECTION (Name, Capacity, Room)
+   8. UPDATE SECTION
    ============================================ */
 export const updateSection = catchAsync(async (req, res, next) => {
   const { id } = req.params;
@@ -302,32 +303,68 @@ export const assignClassTeacher = catchAsync(async (req, res, next) => {
     return next(new AppError("Please provide sectionId and teacherId", 400));
   }
 
-  const section = await Section.findById(sectionId);
-  if (!section) {
-    return next(new AppError("Section not found", 404));
-  }
+  const session = await mongoose.startSession();
+  session.startTransaction();
 
-  const teacher = await Teacher.findById(teacherId);
-  if (!teacher) {
-    return next(new AppError("Teacher not found", 404));
-  }
+  try {
+    const section = await Section.findById(sectionId).session(session);
+    if (!section) {
+      await session.abortTransaction();
+      session.endSession();
+      return next(new AppError("Section not found", 404));
+    }
 
-  // Remove old teacher assignment if exists
-  if (section.classTeacher) {
-    await Teacher.findByIdAndUpdate(
-      section.classTeacher,
-      { $unset: { classTeacherOf: 1 } }
+    const teacher = await Teacher.findById(teacherId).session(session);
+    if (!teacher) {
+      await session.abortTransaction();
+      session.endSession();
+      return next(new AppError("Teacher not found", 404));
+    }
+
+    // 1. Remove old teacher from this section (if exists)
+    if (section.classTeacher) {
+      await Teacher.findByIdAndUpdate(
+        section.classTeacher,
+        { $unset: { classTeacherOf: 1 } },
+        { session }
+      );
+    }
+
+    // 2. Remove this teacher from their previous section (if exists)
+    if (teacher.classTeacherOf && teacher.classTeacherOf.toString() !== sectionId) {
+      await Section.findByIdAndUpdate(
+        teacher.classTeacherOf,
+        { $unset: { classTeacher: 1 } },
+        { session }
+      );
+    }
+
+    // 3. Assign new teacher to section
+    await Section.findByIdAndUpdate(
+      sectionId,
+      { classTeacher: teacherId },
+      { session }
     );
+
+    // 4. Assign section to teacher
+    await Teacher.findByIdAndUpdate(
+      teacherId,
+      { classTeacherOf: sectionId },
+      { session }
+    );
+
+    await session.commitTransaction();
+    session.endSession();
+
+    res.status(200).json({
+      status: "success",
+      message: `${teacher.name} assigned as class teacher`
+    });
+  } catch (error) {
+    await session.abortTransaction();
+    session.endSession();
+    return next(new AppError("Failed to assign class teacher", 500));
   }
-
-  // Assign new teacher
-  await Section.findByIdAndUpdate(sectionId, { classTeacher: teacherId });
-  await Teacher.findByIdAndUpdate(teacherId, { classTeacherOf: sectionId });
-
-  res.status(200).json({
-    status: "success",
-    message: `${teacher.name} assigned as class teacher`
-  });
 });
 
 /* ============================================
@@ -346,7 +383,6 @@ export const deleteSection = catchAsync(async (req, res, next) => {
 
   const section = await Section.findById(id);
   
-  // Remove teacher assignment
   if (section?.classTeacher) {
     await Teacher.findByIdAndUpdate(
       section.classTeacher,
@@ -382,7 +418,6 @@ export const getSectionStats = catchAsync(async (req, res, next) => {
     { $group: { _id: "$gender", count: { $sum: 1 } } }
   ]);
 
-
   res.status(200).json({
     status: "success",
     data: {
@@ -394,20 +429,25 @@ export const getSectionStats = catchAsync(async (req, res, next) => {
       vacancy: section.capacity - totalStudents,
       genderStats
     }
-
   });
 });
 
-
+/* ============================================
+   12. GET SECTION BY ID
+   ============================================ */
 export const getSectionById = catchAsync(async (req, res, next) => {
-    const { id } = req.params;
-    
-    const section = await Section.findById(id)
-      .populate("classTeacher", "name phone teacherId")
-      .populate("classLevel", "name");
-    
-    res.status(200).json({
-      status: "success",
-      data: { section }
-    });
+  const { id } = req.params;
+  
+  const section = await Section.findById(id)
+    .populate("classTeacher", "name phone teacherId")
+    .populate("classLevel", "name");
+  
+  if (!section) {
+    return next(new AppError("Section not found", 404));
+  }
+
+  res.status(200).json({
+    status: "success",
+    data: { section }
   });
+});
