@@ -174,29 +174,61 @@ export const admitStudent = catchAsync(async (req, res, next) => {
 /* ============================================
    2. GET ALL STUDENTS (With Filters)
    ============================================ */
-export const getAllStudents = catchAsync(async (req, res, next) => {
-  // Filter by Class, Section, Status, Name
-  const filter = {};
-  if (req.query.classId) filter.classLevel = req.query.classId;
-  if (req.query.sectionId) filter.section = req.query.sectionId;
-  if (req.query.status) filter.status = req.query.status;
+/* ============================================
+   GET ALL STUDENTS (With Pagination)
+   ============================================ */
+   export const getAllStudents = catchAsync(async (req, res, next) => {
+    const filter = {};
   
-  // Search Logic (Optional)
-  if (req.query.search) {
-    filter.$text = { $search: req.query.search };
-  }
+    // Filters
+    if (req.query.classId) filter.classLevel = req.query.classId;
+    if (req.query.sectionId) filter.section = req.query.sectionId;
+    if (req.query.status) filter.status = req.query.status;
+  
+    // Search
+    if (req.query.search) {
+      filter.$text = { $search: req.query.search };
+    }
 
-  const students = await Student.find(filter)
-    .populate("classLevel", "name")
-    .populate("section", "name")
-    .populate("parent", "fatherName primaryPhone");
+    // Pagination
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 9;
+    const skip = (page - 1) * limit;
 
-  res.status(200).json({
-    status: "success",
-    results: students.length,
-    data: { students }
-  });
+    // Get total count
+    const total = await Student.countDocuments(filter);
+  
+    // Fetch students
+    const students = await Student.find(filter)
+      .select("_id admissionNo firstName lastName rollNo status classLevel section")
+      .populate("classLevel", "name")
+      .populate("section", "name")
+      .skip(skip)
+      .limit(limit);
+  
+    // Format clean response
+    const result = students.map((s) => ({
+      _id: s._id,
+      admissionNo: s.admissionNo,
+      name: `${s.firstName} ${s.lastName || ""}`,
+      class: s.classLevel?.name,
+      section: s.section?.name,
+      rollNo: s.rollNo || null,
+      status: s.status,
+    }));
+  
+    res.status(200).json({
+      status: "success",
+      results: result.length,
+      total,
+      page,
+      totalPages: Math.ceil(total / limit),
+      hasMore: page * limit < total,
+      data: { students: result },
+    });
 });
+
+  
 
 
 
@@ -278,3 +310,65 @@ export const getStudentStats = catchAsync(async (req, res, next) => {
     }
   });
 });
+
+
+/* ============================================
+   UPDATE STUDENT (Partial Update)
+   ============================================ */
+// ... imports (Student, etc)
+
+/* ============================================
+   5. UPDATE STUDENT (Correct/Add Details)
+   ============================================ */
+   export const updateStudent = catchAsync(async (req, res, next) => {
+    const { id } = req.params;
+  
+    // 1. Block sensitive fields (Optional safety)
+    // You generally don't want manual updates to these via a simple Edit form:
+    if (req.body.admissionNo || req.body.balance || req.body.academicYear) {
+       // You can choose to throw error or just delete them from req.body
+       // delete req.body.admissionNo;
+    }
+  
+    // 2. Find and Update
+    // { new: true } returns the updated document
+    // { runValidators: true } ensures 'enum' rules (like gender) are followed
+    const student = await Student.findByIdAndUpdate(id, req.body, {
+      new: true,
+      runValidators: true
+    });
+  
+    if (!student) {
+      return next(new AppError("No student found with that ID", 404));
+    }
+  
+    res.status(200).json({
+      status: "success",
+      message: "Student details updated successfully",
+      data: {
+        student
+      }
+    });
+  });
+  
+  /* ============================================
+     6. GET SINGLE STUDENT (For the Edit Page)
+     ============================================ */
+  // You need this so the Frontend can pre-fill the "Edit Form" with existing data
+  export const getStudent = catchAsync(async (req, res, next) => {
+    const student = await Student.findById(req.params.id)
+      .populate("parent")       // Get Father/Mother info
+      .populate("classLevel")   // Get Class Name
+      .populate("section")      // Get Section Name
+      .populate("academicYear");
+  
+    if (!student) {
+      return next(new AppError("No student found with that ID", 404));
+    }
+  
+    res.status(200).json({
+      status: "success",
+      data: { student }
+    });
+  });
+  

@@ -179,7 +179,7 @@ export const getAdminProfile = async (req, res) => {
         message: "Admin not found",
       });
     }
-    console.log("Fetched Admin Profile:", admin);
+
     res.status(200).json({
       success: true,
       profile: admin,

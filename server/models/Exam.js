@@ -61,7 +61,6 @@ const examSchema = new mongoose.Schema(
   },
   { timestamps: true }
 );
-
 // ⚡ OPTIMIZATION: Prevent Duplicate Exams
 // "You cannot have two 'Mid-Terms' for Class 10 in the same year"
 examSchema.index({ academicYear: 1, classLevel: 1, name: 1 }, { unique: true });

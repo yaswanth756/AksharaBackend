@@ -8,6 +8,8 @@ import authRouter from "./routes/authRoutes.js";
 import inquiryRouter from "./routes/inquiryRoutes.js";
 import coreRouter from "./routes/coreRoutes.js";
 import studentRouter from "./routes/studentRoutes.js";
+import teacherRouter from "./routes/teacherRoutes.js";
+import sectionRouter from "./routes/sectionRoutes.js";
 
 const app = express();
 dotenv.config();
@@ -35,6 +37,13 @@ app.use("/api/v1/core", coreRouter);
 
 // Student Routes
 app.use("/api/v1/students", studentRouter);
+
+
+// Teacher Routes
+app.use("/api/v1/teachers", teacherRouter);
+
+// Section Routes
+app.use("/api/v1/sections", sectionRouter);
 
 
 app.get('/', (req, res) => {

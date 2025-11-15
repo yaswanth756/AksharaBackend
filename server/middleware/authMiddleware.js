@@ -35,7 +35,7 @@ export const protect = catchAsync(async (req, res, next) => {
     );
   }
 
-  console.log("Protected Route Accessed by:", currentUser);
+ 
   req.user = currentUser;
   next();
 });

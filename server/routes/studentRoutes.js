@@ -3,7 +3,9 @@ import {
   admitStudent, 
   getAllStudents, 
   searchStudents,   
-  getStudentStats  
+  getStudentStats,
+  getStudent, 
+  updateStudent 
 } from "../controllers/studentController.js";
 import { protect, restrictTo } from "../middleware/authMiddleware.js";
 
@@ -20,4 +22,9 @@ router.get("/stats", restrictTo("ADMIN,", "OPERATOR"), getStudentStats); // /api
 router.post("/admit", restrictTo("ADMIN", "OPERATOR"), admitStudent);
 router.get("/", restrictTo("ADMIN", "OPERATOR", "TEACHER"), getAllStudents);
 
+
+router
+  .route("/:id")
+  .get(getStudent)                                      // View Profile
+  .patch(restrictTo("ADMIN", "OPERATOR"), updateStudent);
 export default router;
