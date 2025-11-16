@@ -10,6 +10,7 @@ import coreRouter from "./routes/coreRoutes.js";
 import studentRouter from "./routes/studentRoutes.js";
 import teacherRouter from "./routes/teacherRoutes.js";
 import sectionRouter from "./routes/sectionRoutes.js";
+import attendanceRouter from "./routes/attendanceRoutes.js";
 
 
 
@@ -46,6 +47,10 @@ app.use("/api/v1/teachers", teacherRouter);
 
 // Section Routes
 app.use("/api/v1/sections", sectionRouter);
+
+
+// Attendance Routes
+app.use("/api/v1/attendance", attendanceRouter);
 
 
 app.get('/test', (req, res) => {
