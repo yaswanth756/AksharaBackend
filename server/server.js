@@ -11,8 +11,8 @@ import studentRouter from "./routes/studentRoutes.js";
 import teacherRouter from "./routes/teacherRoutes.js";
 import sectionRouter from "./routes/sectionRoutes.js";
 import attendanceRouter from "./routes/attendanceRoutes.js";
-
-
+import examRouter from "./routes/examRoutes.js";
+import { seedFullDatabase } from './utils/seedData.js';
 
 const app = express();
 dotenv.config();
@@ -28,6 +28,9 @@ const PORT = process.env.PORT;
 
 // Connect to database
 connectDB();
+
+
+//seedFullDatabase()
 
 // auth Routes
 app.use("/api/v1/auth", authRouter);
@@ -51,6 +54,10 @@ app.use("/api/v1/sections", sectionRouter);
 
 // Attendance Routes
 app.use("/api/v1/attendance", attendanceRouter);
+
+
+// Exam Routes
+app.use("/api/v1/exams", examRouter);
 
 
 app.get('/test', (req, res) => {

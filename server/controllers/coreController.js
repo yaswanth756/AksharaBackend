@@ -23,7 +23,7 @@ export const createAcademicYear = catchAsync(async (req, res, next) => {
 export const getAllYears = catchAsync(async (req, res, next) => {
   // Frontend needs this for the Dropdown!
   const years = await AcademicYear.find().sort("-startDate");
-  console.log(years);
+ 
   res.status(200).json({ status: "success", results: years.length, data: { years } });
 });
 

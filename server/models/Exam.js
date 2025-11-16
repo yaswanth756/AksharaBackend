@@ -2,56 +2,47 @@ import mongoose from "mongoose";
 
 const examSchema = new mongoose.Schema(
   {
-    // 🏷️ Exam Name (e.g., "Annual Final Exam 2025")
+    // 🏷️ Identity
     name: { 
       type: String, 
       required: true, 
       trim: true 
     },
 
-    // 🔗 Context: When and Where?
+    // 🔗 Context
     academicYear: { 
       type: mongoose.Schema.Types.ObjectId, 
       ref: "AcademicYear", 
       required: true 
     },
-    
     classLevel: { 
       type: mongoose.Schema.Types.ObjectId, 
       ref: "ClassLevel", 
       required: true 
     },
 
-    // 🎯 SECTION LOGIC (The Workflow Fix)
-    // [] = Empty Array means "Global" (All sections in Class 10 take this).
-    // [ID_A, ID_B] = Specific (Only Section A and B take this).
+    // 🎯 Section Logic (Global vs Specific)
     applicableSections: [
       { type: mongoose.Schema.Types.ObjectId, ref: "Section" }
     ],
 
-    // 📝 The "Blueprint" (Subjects & Max Marks)
+    // 📝 Configuration
     subjects: [
       {
-        name: { type: String, required: true }, // "Mathematics"
+        name: { type: String, required: true },
         
-        // Scheduling
         date: { type: Date }, 
-        startTime: { type: String }, // "09:00"
-        durationMins: { type: Number }, // 180
+        startTime: { type: String }, 
+        durationMins: { type: Number },
         
-        // Grading Rules
-        maxMarks: { type: Number, required: true },  // e.g., 100
-        passMarks: { type: Number, required: true }, // e.g., 33
+        maxMarks: { type: Number, required: true },
+        passMarks: { type: Number, required: true },
         
-        // Is this optional? (e.g., "Computer Science" vs "Physical Ed")
         isOptional: { type: Boolean, default: false } 
       }
     ],
 
-    // 🚦 Status Flag
-    // DRAFT: Only Admin sees it.
-    // PUBLISHED: Teachers can see it and enter marks.
-    // COMPLETED: Marks entry is locked.
+    // 🚦 Status
     status: {
       type: String,
       enum: ["DRAFT", "PUBLISHED", "COMPLETED"],
@@ -61,8 +52,8 @@ const examSchema = new mongoose.Schema(
   },
   { timestamps: true }
 );
-// ⚡ OPTIMIZATION: Prevent Duplicate Exams
-// "You cannot have two 'Mid-Terms' for Class 10 in the same year"
+
+// ⚡ Prevent Duplicates
 examSchema.index({ academicYear: 1, classLevel: 1, name: 1 }, { unique: true });
 
 export default mongoose.model("Exam", examSchema);

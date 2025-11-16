@@ -2,7 +2,7 @@ import mongoose from "mongoose";
 
 const examResultSchema = new mongoose.Schema(
   {
-    // 🔗 Context (Indexed for Speed)
+    // 🔗 Context
     student: { 
       type: mongoose.Schema.Types.ObjectId, 
       ref: "Student", 
@@ -14,7 +14,7 @@ const examResultSchema = new mongoose.Schema(
       required: true 
     },
     
-    // ⚡ Snapshots (Denormalized for fast reporting without joining)
+    // ⚡ Snapshots
     academicYear: { type: mongoose.Schema.Types.ObjectId, ref: "AcademicYear", required: true },
     classLevel: { type: mongoose.Schema.Types.ObjectId, ref: "ClassLevel", required: true },
     section: { type: mongoose.Schema.Types.ObjectId, ref: "Section", required: true },
@@ -22,36 +22,42 @@ const examResultSchema = new mongoose.Schema(
     // 📝 Detailed Marks Ledger
     marks: [
       {
-        subjectName: { type: String, required: true }, // "Mathematics"
-        subjectId: { type: mongoose.Schema.Types.ObjectId }, // Optional: Link to Subject model if exists
+        subjectName: { type: String, required: true }, 
+        subjectId: { type: mongoose.Schema.Types.ObjectId }, 
         
-        // 🔢 The Numbers
-        obtainedMarks: { type: Number, required: true, default: 0 }, // Raw Score
-        graceMarks: { type: Number, default: 0 }, // Extra marks added by Admin
-        totalMarks: { type: Number, required: true }, // Max Marks (Snapshot)
+        obtainedMarks: { type: Number, required: true, default: 0 },
+        graceMarks: { type: Number, default: 0 }, 
+        totalMarks: { type: Number, required: true }, 
         
-        grade: { type: String }, // "A1"
+        grade: { type: String }, 
         
-        // 🚦 Status
         status: { 
           type: String, 
           enum: ["PASS", "FAIL", "ABSENT", "EXEMPT"], 
           default: "PASS" 
         },
         
-        // 🕵️ Accountability: Who graded this specific subject?
-        gradedBy: { type: mongoose.Schema.Types.ObjectId, ref: "Teacher" },
+        // 🕵️ Accountability: Dynamic Reference (FIXED)
+        // Allows both Teachers AND Admins to grade without breaking links
+        gradedBy: { 
+          type: mongoose.Schema.Types.ObjectId, 
+          refPath: 'marks.graderModel' 
+        },
+        graderModel: {
+          type: String,
+          enum: ['Admin', 'Teacher'],
+          default: 'Teacher'
+        },
         
-        remarks: String // e.g. "Weak in Algebra"
+        remarks: String 
       }
     ],
 
-    // 📊 Aggregates (Auto-calculated)
-    totalObtained: { type: Number, default: 0 }, // (Obtained + Grace)
+    // 📊 Aggregates
+    totalObtained: { type: Number, default: 0 },
     totalMaxMarks: { type: Number, default: 0 },
     percentage: { type: Number, default: 0 },
     
-    // 🏆 Rank & Result
     rank: { type: Number }, 
     resultStatus: {
       type: String,
@@ -59,30 +65,27 @@ const examResultSchema = new mongoose.Schema(
       default: "PASS"
     },
 
-    // 🔒 Locking Mechanism
-    // If true, no more changes allowed (even by teachers). Only Super Admin can unlock.
+    // 🔒 Locking
     isLocked: { type: Boolean, default: false },
 
-    // 🕵️ Audit Trail (Who touched this document last?)
+    // 🕵️ Document Audit: Dynamic Reference (FIXED)
     lastModifiedBy: { 
       type: mongoose.Schema.Types.ObjectId, 
-      ref: "Admin" // Or Teacher
+      refPath: 'modifierModel' 
     },
-    modificationReason: { type: String } // e.g. "Re-evaluation request"
+    modifierModel: {
+      type: String,
+      enum: ['Admin', 'Teacher'],
+      default: 'Admin'
+    },
+    modificationReason: { type: String }
   },
   { timestamps: true }
 );
 
-// ⚡ OPTIMIZATION 1: Unique Constraint
-// "Ravi can only have ONE result sheet for the Mid-Term Exam"
+// ⚡ Indexes
 examResultSchema.index({ exam: 1, student: 1 }, { unique: true });
-
-// ⚡ OPTIMIZATION 2: Topper List Query
-// "Get Top 3 Students"
 examResultSchema.index({ exam: 1, percentage: -1 });
-
-// ⚡ OPTIMIZATION 3: Failures List
-// "Get all failed students for remedial class"
 examResultSchema.index({ exam: 1, resultStatus: "FAIL" });
 
 export default mongoose.model("ExamResult", examResultSchema);

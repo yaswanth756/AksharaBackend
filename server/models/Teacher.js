@@ -63,6 +63,11 @@ const teacherSchema = new mongoose.Schema(
     photoUrl: String,
     perviousSchool: String,
 
+    role: {
+      type: String,
+      default: "TEACHER" // This ensures req.user.role === "TEACHER" works
+    },
+
     status: {
       type: String,
       enum: ["ACTIVE", "ON_LEAVE", "LEFT"],
