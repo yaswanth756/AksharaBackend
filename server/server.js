@@ -12,6 +12,7 @@ import teacherRouter from "./routes/teacherRoutes.js";
 import sectionRouter from "./routes/sectionRoutes.js";
 import attendanceRouter from "./routes/attendanceRoutes.js";
 import examRouter from "./routes/examRoutes.js";
+import feeRouter from './routes/feeRoutes.js';
 import { seedFullDatabase } from './utils/seedData.js';
 
 const app = express();
@@ -58,6 +59,9 @@ app.use("/api/v1/attendance", attendanceRouter);
 
 // Exam Routes
 app.use("/api/v1/exams", examRouter);
+
+// Fee Routes
+app.use('/api/v1/fees', feeRouter);
 
 
 app.get('/test', (req, res) => {

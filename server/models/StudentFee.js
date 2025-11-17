@@ -1,75 +1,62 @@
-// models/StudentFee.js
 import mongoose from "mongoose";
 
+// This is the STUDENT'S PERSONAL BILL (Ledger)
+// It only tracks balances.
 const studentFeeSchema = new mongoose.Schema(
   {
-    student: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: "Student",
-      required: true,
+    student: { 
+      type: mongoose.Schema.Types.ObjectId, 
+      ref: "Student", 
+      required: true 
     },
-    academicYear: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: "AcademicYear",
-      required: true,
+    academicYear: { 
+      type: mongoose.Schema.Types.ObjectId, 
+      ref: "AcademicYear", 
+      required: true 
     },
-    classLevel: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: "ClassLevel",
-      required: true,
+    feeStructure: { 
+      type: mongoose.Schema.Types.ObjectId, 
+      ref: "FeeStructure", 
+      required: true 
     },
-    feeStructure: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: "FeeStructure",
-      required: true,
-    },
-    totalAmount: {
-      type: Number,
-      required: true,
-      min: 0,
-    },
-    paidAmount: {
-      type: Number,
-      default: 0,
-      min: 0,
-    },
-    dueAmount: {
-      type: Number,
-      required: true,
-      min: 0,
-    },
+
+    // --- The Main Balance Sheet ---
+    totalAmount: { type: Number, required: true }, // e.g., 50,000
+    concessionAmount: { type: Number, default: 0 }, // e.g., 5,000 (Scholarship)
+    finalAmount: { type: Number, required: true }, // 45,000 (Total - Concession)
+    
+    paidAmount: { type: Number, default: 0 }, // Total paid so far
+    dueAmount: { type: Number, required: true },   // (Final - Paid)
+    
     status: {
       type: String,
-      enum: ["PENDING", "PARTIALLY_PAID", "PAID", "OVERDUE", "CANCELLED"],
+      enum: ["PENDING", "PARTIAL", "PAID"],
       default: "PENDING",
+      index: true
     },
+
+    // --- The Installment Plan (What is Owed) ---
     installments: [
       {
-        name: String,
-        amount: Number,
+        name: String,      // "Tuition Fee - April"
+        amount: Number,    // 5000
         dueDate: Date,
-        status: {
-          type: String,
-          enum: ["PENDING", "PAID", "OVERDUE", "CANCELLED"],
-          default: "PENDING",
-        },
-        paymentDate: Date,
-        paymentMode: String,
-        referenceNo: String,
-        collectedBy: {
-          type: mongoose.Schema.Types.ObjectId,
-          ref: "Admin",
-        },
-      },
+        
+        // This tracks how much of this specific installment is paid
+        paidAmount: { type: Number, default: 0 },
+        
+        status: { 
+          type: String, 
+          enum: ["PENDING", "PAID", "PARTIAL"], 
+          default: "PENDING" 
+        }
+      }
     ],
     remarks: String,
   },
   { timestamps: true }
 );
 
-// Indexes for better query performance
-studentFeeSchema.index({ student: 1, academicYear: 1 });
-studentFeeSchema.index({ status: 1 });
-studentFeeSchema.index({ "installments.dueDate": 1 });
+studentFeeSchema.index({ student: 1, academicYear: 1 }, { unique: true });
 
 export default mongoose.model("StudentFee", studentFeeSchema);

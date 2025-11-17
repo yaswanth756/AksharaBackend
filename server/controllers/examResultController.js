@@ -131,43 +131,63 @@ export const bulkUpdateMarks = catchAsync(async (req, res, next) => {
    2. ADMIN OVERRIDE (Grace Marks / Correction)
    Handles Single Student Edit with Reason Log
    ============================================ */
-export const updateSingleResult = catchAsync(async (req, res, next) => {
-  const { id } = req.params; // ExamResult ID
-  const { subjectName, newMarks, graceMarks, reason } = req.body;
-
-  const result = await ExamResult.findById(id);
-  if (!result) return next(new AppError("Result not found", 404));
-
-  // Security: Only Admin can change locked results
-  if (result.isLocked && req.user.role !== "ADMIN") {
-    return next(new AppError("This result is locked.", 403));
-  }
-
-  // Find Subject
-  const subjectIndex = result.marks.findIndex(m => m.subjectName === subjectName);
-  if (subjectIndex === -1) return next(new AppError("Subject not found in this result", 404));
-
-  // Update
-  if (newMarks !== undefined) result.marks[subjectIndex].obtainedMarks = newMarks;
-  if (graceMarks !== undefined) result.marks[subjectIndex].graceMarks = graceMarks;
-
-  // Audit Log
-  result.modificationReason = reason; // "Principal added grace marks"
-  result.lastModifiedBy = req.user._id;
-
-  // Recalculate Totals (Same logic as above)
-  result.totalObtained = result.marks.reduce((sum, m) => sum + m.obtainedMarks + (m.graceMarks || 0), 0);
-  // ... (percentage calc) ...
-  result.percentage = (result.totalObtained / result.totalMaxMarks) * 100;
-
-  await result.save();
-
-  res.status(200).json({
-    status: "success",
-    message: "Result updated manually",
-    data: { result }
+   export const updateSingleResult = catchAsync(async (req, res, next) => {
+    const { id } = req.params; // ExamResult ID
+    const { subjectName, newMarks, graceMarks, reason } = req.body;
+  
+    const result = await ExamResult.findById(id);
+    if (!result) return next(new AppError("Result not found", 404));
+  
+    if (result.isLocked && req.user.role !== "ADMIN") {
+      return next(new AppError("This result is locked.", 403));
+    }
+  
+    const subjectIndex = result.marks.findIndex(m => m.subjectName === subjectName);
+    if (subjectIndex === -1) return next(new AppError("Subject not found in this result", 404));
+  
+    const subject = result.marks[subjectIndex];
+    if (newMarks !== undefined && (newMarks < 0 || newMarks > subject.totalMarks)) {
+      return next(new AppError(`Marks must be between 0 and ${subject.totalMarks}`, 400));
+    }
+  
+    // ----- UPDATE MARKS -----
+    if (newMarks !== undefined) result.marks[subjectIndex].obtainedMarks = newMarks;
+    if (graceMarks !== undefined) result.marks[subjectIndex].graceMarks = graceMarks;
+  
+    // ----- UPDATE STATUS (PASS/FAIL) -----
+    // Re-fetch reference Exam document if needed for pass marks per subject
+    const exam = await Exam.findById(result.exam);
+    const subjectMeta = exam.subjects.find(s => s.name === subjectName);
+    const passMarks = subjectMeta?.passMarks ?? 35; // fallback
+  
+    const totalForSubject = 
+      (result.marks[subjectIndex].obtainedMarks || 0) + (result.marks[subjectIndex].graceMarks || 0);
+    result.marks[subjectIndex].status = totalForSubject >= passMarks ? "PASS" : "FAIL";
+  
+    // ----- UPDATE OVERALL RESULT -----
+    result.totalObtained = result.marks.reduce((sum, m) => sum + (m.obtainedMarks || 0) + (m.graceMarks || 0), 0);
+    result.percentage = (result.totalObtained / result.totalMaxMarks) * 100;
+  
+    // If **any** subject failed, overall FAIL
+    const hasFailed = result.marks.some(m => m.status === "FAIL");
+    result.resultStatus = hasFailed ? "FAIL" : "PASS";
+  
+    // ----- AUDIT -----
+    if (!reason || reason.trim().length < 5) {
+      return next(new AppError("Reason is required (minimum 5 characters)", 400));
+    }
+    result.modificationReason = reason;
+    result.lastModifiedBy = req.user._id;
+  
+    await result.save();
+  
+    res.status(200).json({
+      status: "success",
+      message: "Result updated and status recalculated",
+      data: { result }
+    });
   });
-});
+  
 
 /* ============================================
    3. GET CLASS REPORT (The Grid)
