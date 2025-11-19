@@ -11,7 +11,9 @@ import {
 import { 
   getStudentFeeLedger, 
   applyConcession, 
-  getDefaultersReport 
+  getDefaultersReport ,
+  getStudentFeeLedgerByNameOrAdmission,
+  getDashboardStats
 } from "../controllers/studentFeeController.js";
 import { protect, restrictTo } from "../middleware/authMiddleware.js";
 
@@ -29,8 +31,9 @@ router.get("/history/:studentId", getPaymentHistory);
 router.get("/reports/collection", restrictTo("ADMIN"), getCollectionReport);
 
 // --- Student Ledger (Bills) ---
+router.get('/ledger/search', getStudentFeeLedgerByNameOrAdmission);
 router.get("/ledger/:studentId", getStudentFeeLedger);
 router.post("/ledger/concession/:ledgerId", restrictTo("ADMIN"), applyConcession);
 router.get("/reports/defaulters", restrictTo("ADMIN"), getDefaultersReport);
-
+router.get("/dashboard/stats", restrictTo("ADMIN", "OPERATOR"), getDashboardStats);
 export default router;

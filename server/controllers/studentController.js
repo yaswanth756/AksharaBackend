@@ -171,8 +171,8 @@ export const getAllStudents = catchAsync(async (req, res, next) => {
   }
 
   // Pagination
-  const page = parseInt(req.query.page) || 1;
-  const limit = parseInt(req.query.limit) || 9;
+  const page = parseInt(req.query.page);
+  const limit = parseInt(req.query.limit);
   const skip = (page - 1) * limit;
 
   // Get total count for pagination headers
@@ -227,6 +227,7 @@ export const searchStudents = catchAsync(async (req, res, next) => {
     .populate("section", "name")
     .select("firstName lastName admissionNo photoUrl classLevel section status");
 
+    console.log("Search Students Result:", students);
   res.status(200).json({
     status: "success",
     results: students.length,

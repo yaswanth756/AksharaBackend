@@ -129,6 +129,7 @@ export const generateStudentFeeLedger = async (student, academicYear, classLevel
     status: "PENDING",
     installments
   }], { session });
+  console.log("Studnest fee", studentFee[0]);
 
   return studentFee[0];
 };
