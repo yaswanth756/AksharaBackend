@@ -6,6 +6,7 @@ import Student from "../models/Student.js";
 import Teacher from "../models/Teacher.js";
 import { catchAsync } from "../utils/catchAsync.js";
 import { AppError } from "../utils/appError.js";
+import cache from "../utils/cache.js";
 
 /* ============================================
    1. CREATE SECTION
@@ -24,6 +25,9 @@ export const createSection = catchAsync(async (req, res, next) => {
     capacity: capacity || 40,
     roomNumber
   });
+
+  // Invalidate cache
+  cache.del(`sections_${classLevelId}`);
 
   res.status(201).json({
     status: "success",
@@ -49,9 +53,9 @@ export const getSectionsByClass = catchAsync(async (req, res, next) => {
 
   const sectionsWithCount = await Promise.all(
     sections.map(async (section) => {
-      const studentCount = await Student.countDocuments({ 
-        section: section._id, 
-        status: "ACTIVE" 
+      const studentCount = await Student.countDocuments({
+        section: section._id,
+        status: "ACTIVE"
       });
       return {
         ...section.toObject(),
@@ -81,12 +85,12 @@ export const getStudentsInSection = catchAsync(async (req, res, next) => {
     return next(new AppError("Section not found", 404));
   }
 
-  const students = await Student.find({ 
-    section: id, 
-    status: "ACTIVE" 
+  const students = await Student.find({
+    section: id,
+    status: "ACTIVE"
   })
-  .select("admissionNo firstName lastName rollNo photoUrl")
-  .sort("rollNo");
+    .select("admissionNo firstName lastName rollNo photoUrl")
+    .sort("rollNo");
 
   res.status(200).json({
     status: "success",
@@ -167,26 +171,26 @@ export const assignStudentsToSection = catchAsync(async (req, res, next) => {
     return next(new AppError("Section not found", 404));
   }
 
-  const currentCount = await Student.countDocuments({ 
-    section: id, 
-    status: "ACTIVE" 
+  const currentCount = await Student.countDocuments({
+    section: id,
+    status: "ACTIVE"
   });
   const newTotal = currentCount + studentIds.length;
-  
+
   if (newTotal > section.capacity) {
     return next(new AppError(
-      `Cannot assign students. Section capacity is ${section.capacity}, current: ${currentCount}, trying to add: ${studentIds.length}`, 
+      `Cannot assign students. Section capacity is ${section.capacity}, current: ${currentCount}, trying to add: ${studentIds.length}`,
       400
     ));
   }
 
   const result = await Student.updateMany(
     { _id: { $in: studentIds } },
-    { 
-      $set: { 
+    {
+      $set: {
         section: id,
         classLevel: section.classLevel
-      } 
+      }
     }
   );
 
@@ -213,26 +217,26 @@ export const shiftStudentToSection = catchAsync(async (req, res, next) => {
 
   const targetSection = await Section.findById(targetSectionId)
     .populate("classLevel", "name");
-    
+
   if (!targetSection) {
     return next(new AppError("Target section not found", 404));
   }
 
-  const currentCount = await Student.countDocuments({ 
-    section: targetSectionId, 
-    status: "ACTIVE" 
+  const currentCount = await Student.countDocuments({
+    section: targetSectionId,
+    status: "ACTIVE"
   });
-  
+
   if (currentCount >= targetSection.capacity) {
     return next(new AppError(
-      `Target section is full. Capacity: ${targetSection.capacity}`, 
+      `Target section is full. Capacity: ${targetSection.capacity}`,
       400
     ));
   }
 
   const student = await Student.findByIdAndUpdate(
     studentId,
-    { 
+    {
       section: targetSectionId,
       classLevel: targetSection.classLevel._id
     },
@@ -279,12 +283,19 @@ export const updateSection = catchAsync(async (req, res, next) => {
     new: true,
     runValidators: true
   })
-  .populate("classTeacher", "name phone")
-  .populate("classLevel", "name");
+    .populate("classTeacher", "name phone")
+    .populate("classLevel", "name");
 
   if (!section) {
     return next(new AppError("Section not found", 404));
   }
+
+  // Invalidate cache using the section's classLevel
+  // Note: section.classLevel is populated, so it might be an object. 
+  // If it's an object, we need ._id, if it's an ID, we use it directly.
+  // Mongoose populate replaces the ID with the object.
+  const classId = section.classLevel._id || section.classLevel;
+  cache.del(`sections_${classId}`);
 
   res.status(200).json({
     status: "success",
@@ -376,13 +387,13 @@ export const deleteSection = catchAsync(async (req, res, next) => {
   const studentCount = await Student.countDocuments({ section: id });
   if (studentCount > 0) {
     return next(new AppError(
-      `Cannot delete section. It has ${studentCount} students. Please remove or shift them first.`, 
+      `Cannot delete section. It has ${studentCount} students. Please remove or shift them first.`,
       400
     ));
   }
 
   const section = await Section.findById(id);
-  
+
   if (section?.classTeacher) {
     await Teacher.findByIdAndUpdate(
       section.classTeacher,
@@ -390,7 +401,11 @@ export const deleteSection = catchAsync(async (req, res, next) => {
     );
   }
 
-  await Section.findByIdAndDelete(id);
+  if (section) {
+    // Invalidate cache before deleting
+    cache.del(`sections_${section.classLevel}`);
+    await Section.findByIdAndDelete(id);
+  }
 
   res.status(204).json({
     status: "success",
@@ -404,11 +419,11 @@ export const deleteSection = catchAsync(async (req, res, next) => {
 export const getSectionStats = catchAsync(async (req, res, next) => {
   const { id } = req.params;
 
-  const totalStudents = await Student.countDocuments({ 
-    section: id, 
-    status: "ACTIVE" 
+  const totalStudents = await Student.countDocuments({
+    section: id,
+    status: "ACTIVE"
   });
-  
+
   const section = await Section.findById(id)
     .populate("classTeacher", "name photoUrl phone teacherId")
     .populate("classLevel", "name");
@@ -437,11 +452,11 @@ export const getSectionStats = catchAsync(async (req, res, next) => {
    ============================================ */
 export const getSectionById = catchAsync(async (req, res, next) => {
   const { id } = req.params;
-  
+
   const section = await Section.findById(id)
     .populate("classTeacher", "name phone teacherId")
     .populate("classLevel", "name");
-  
+
   if (!section) {
     return next(new AppError("Section not found", 404));
   }

@@ -4,6 +4,7 @@ import Parent from "../models/Parent.js";
 
 import { catchAsync } from "../utils/catchAsync.js";
 import { AppError } from "../utils/appError.js";
+import { shortCache } from "../utils/cache.js";
 
 // 💡 IMPORT THE FINANCE HELPER
 import { generateStudentFeeLedger } from "./feeStructureController.js";
@@ -227,7 +228,7 @@ export const searchStudents = catchAsync(async (req, res, next) => {
     .populate("section", "name")
     .select("firstName lastName admissionNo photoUrl classLevel section status");
 
-    console.log("Search Students Result:", students);
+  console.log("Search Students Result:", students);
   res.status(200).json({
     status: "success",
     results: students.length,
@@ -239,6 +240,16 @@ export const searchStudents = catchAsync(async (req, res, next) => {
    4. GET DASHBOARD STATS
    ============================================ */
 export const getStudentStats = catchAsync(async (req, res, next) => {
+  // Check cache
+  const cacheKey = "student_dashboard_stats";
+  if (shortCache.has(cacheKey)) {
+    return res.status(200).json({
+      status: "success",
+      source: "cache",
+      data: shortCache.get(cacheKey)
+    });
+  }
+
   const stats = await Student.aggregate([
     { $match: { status: "ACTIVE" } },
     {
@@ -251,7 +262,7 @@ export const getStudentStats = catchAsync(async (req, res, next) => {
           { $group: { _id: "$classLevel", count: { $sum: 1 } } },
           {
             $lookup: {
-              from: "classlevels", 
+              from: "classlevels",
               localField: "_id",
               foreignField: "_id",
               as: "classInfo"
@@ -270,13 +281,17 @@ export const getStudentStats = catchAsync(async (req, res, next) => {
     }
   ]);
 
+  const responseData = {
+    totalStudents: stats[0].totalCount[0]?.count || 0,
+    genderStats: stats[0].genderDistribution,
+    classStats: stats[0].classDistribution
+  };
+
+  shortCache.set(cacheKey, responseData);
+
   res.status(200).json({
     status: "success",
-    data: {
-      totalStudents: stats[0].totalCount[0]?.count || 0,
-      genderStats: stats[0].genderDistribution,
-      classStats: stats[0].classDistribution
-    }
+    data: responseData
   });
 });
 
@@ -287,8 +302,8 @@ export const updateStudent = catchAsync(async (req, res, next) => {
   const { id } = req.params;
 
   if (req.body.admissionNo || req.body.balance || req.body.academicYear) {
-     // Block sensitive fields from being updated here
-     return next(new AppError("Cannot update sensitive fields from this route", 400));
+    // Block sensitive fields from being updated here
+    return next(new AppError("Cannot update sensitive fields from this route", 400));
   }
 
   const student = await Student.findByIdAndUpdate(id, req.body, {

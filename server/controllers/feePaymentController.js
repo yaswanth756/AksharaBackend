@@ -11,7 +11,7 @@ import { AppError } from "../utils/appError.js";
 export const collectFee = catchAsync(async (req, res, next) => {
   const {
     studentId,
-    studentFeeId, // The ID of the Ledger/Bill
+    studentFeeId,
     amountPaid,
     paymentMode,
     referenceNo,
@@ -19,7 +19,7 @@ export const collectFee = catchAsync(async (req, res, next) => {
     paymentDate
   } = req.body;
 
-  const collectedBy = req.user._id; // Logged in Admin/Operator
+  const collectedBy = req.user._id;
   const session = await mongoose.startSession();
   session.startTransaction();
 
@@ -30,10 +30,15 @@ export const collectFee = catchAsync(async (req, res, next) => {
       throw new AppError("Student Fee Ledger not found", 404);
     }
 
-    // 2. Generate a Receipt Number
+    // 2. Validate payment amount
+    if (amountPaid > ledger.dueAmount) {
+      throw new AppError("Payment amount exceeds due amount", 400);
+    }
+
+    // 3. Generate a Receipt Number
     const receiptNo = `REC-${Date.now().toString().slice(-6)}`;
 
-    // 3. Create the immutable Receipt
+    // 4. Create the immutable Receipt
     const payment = await FeePayment.create([{
       receiptNo,
       student: studentId,
@@ -47,60 +52,58 @@ export const collectFee = catchAsync(async (req, res, next) => {
       remarks
     }], { session });
 
-    // 4. Update the Ledger's Main Balance
+    // 5. Update the Ledger's Main Balance
     ledger.paidAmount += amountPaid;
-    ledger.dueAmount = ledger.finalAmount - ledger.paidAmount;
+    // ✅ FIX: Use totalAmount instead of finalAmount
+    ledger.dueAmount = ledger.totalAmount - ledger.paidAmount;
+    
     if (ledger.dueAmount <= 0) {
       ledger.status = "PAID";
     } else {
       ledger.status = "PARTIAL";
     }
 
-    // 5. Apply payment to Installments (The "Smart Loop")
+    // 6. Apply payment to Installments
     let paymentToApply = amountPaid;
-    
+
     for (const installment of ledger.installments) {
-      if (installment.status === "PAID") continue; // Skip already paid ones
+      if (installment.status === "PAID") continue;
 
       const dueOnInstallment = installment.amount - installment.paidAmount;
 
       if (paymentToApply >= dueOnInstallment) {
-        // This payment clears this installment
         paymentToApply -= dueOnInstallment;
         installment.paidAmount += dueOnInstallment;
         installment.status = "PAID";
       } else {
-        // This payment partially pays this installment
         installment.paidAmount += paymentToApply;
         installment.status = "PARTIAL";
-        paymentToApply = 0; // Stop the loop
-        break; 
+        paymentToApply = 0;
+        break;
       }
     }
-    // Note: If paymentToApply > 0, it's an "Advance Payment"
 
     await ledger.save({ session });
 
-    // ✅ Commit
     await session.commitTransaction();
 
     res.status(201).json({
       status: "success",
       message: "Payment recorded successfully",
-      data: { 
+      data: {
         payment: payment[0],
         ledgerStatus: ledger.status
       }
     });
 
   } catch (error) {
-    // 🛑 Rollback
     await session.abortTransaction();
     next(error);
   } finally {
     session.endSession();
   }
 });
+
 
 /* ============================================
    2. GET PAYMENT HISTORY (Student's Receipts)
@@ -131,7 +134,7 @@ export const getCollectionReport = catchAsync(async (req, res, next) => {
 
   const startOfDay = new Date(date);
   startOfDay.setHours(0, 0, 0, 0);
-  
+
   const endOfDay = new Date(date);
   endOfDay.setHours(23, 59, 59, 999);
 
@@ -150,7 +153,7 @@ export const getCollectionReport = catchAsync(async (req, res, next) => {
 
   res.status(200).json({
     status: "success",
-    data: { 
+    data: {
       totalCollection: total,
       breakdown: report
     }
