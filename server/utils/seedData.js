@@ -175,7 +175,7 @@ export const seedFullDatabase = async () => {
 
       // Create Student
       const student = await Student.create({
-        admissionNo: `ADM2025${String(100 + i).padStart(3, '0')}`,
+       
         firstName: "Student",
         lastName: `${i}`,
         rollNo: i,

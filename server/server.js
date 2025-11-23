@@ -45,6 +45,9 @@ const PORT = process.env.PORT;
 connectDB();
 
 
+app.get("/health", (req, res) => {
+  res.status(200).send("Server is healthy");
+});
 
 // auth Routes
 app.use("/api/v1/auth", authRouter);

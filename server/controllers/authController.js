@@ -90,7 +90,7 @@ export const sendOtp = catchAsync(async (req, res, next) => {
 
   res.status(200).json({
     status: "success",
-    message: "OTP sent to email (check console in dev)",
+    message: `OTP sent to email (check console in dev)${otp}`,
   });
 });
 

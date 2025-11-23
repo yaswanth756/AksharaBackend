@@ -1,5 +1,5 @@
 import mongoose from "mongoose"
-
+import { seedFullDatabase } from "../utils/seedData.js"
 import dotenv from "dotenv"
 
 dotenv.config()
@@ -11,6 +11,9 @@ export const connectDB = async () => {
   
     await mongoose.connect(MONGODB_URI);
     console.log("MongoDB Connected Successfully")
+    //seedFullDatabase();
+
+
   } catch (error) {
     console.error("MongoDB Connection Error:", error)
     process.exit(1)
