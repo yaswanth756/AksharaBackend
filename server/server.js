@@ -34,8 +34,7 @@ const limiter = rateLimit({
 app.use(limiter);
 
 app.use(cors({
-  origin: 'https://aksharaschool.vercel.app',
-  origin: 'http://localhost:3000',
+  origin: ['https://aksharaschool.vercel.app', 'http://localhost:3000'],
   credentials: true,
 }));
 app.use(express.json());
@@ -51,34 +50,34 @@ app.get("/health", (req, res) => {
 });
 
 // auth Routes
-app.use("/api/v1/auth", authRouter);
+app.use(["/api/v1/auth", "/v1/auth"], authRouter);
 
 // Inquiry Routes
-app.use("/api/v1/inquiries", inquiryRouter);
+app.use(["/api/v1/inquiries", "/v1/inquiries"], inquiryRouter);
 
 // Core Routes
-app.use("/api/v1/core", coreRouter);
+app.use(["/api/v1/core", "/v1/core"], coreRouter);
 
 // Student Routes
-app.use("/api/v1/students", studentRouter);
+app.use(["/api/v1/students", "/v1/students"], studentRouter);
 
 
 // Teacher Routes
-app.use("/api/v1/teachers", teacherRouter);
+app.use(["/api/v1/teachers", "/v1/teachers"], teacherRouter);
 
 // Section Routes
-app.use("/api/v1/sections", sectionRouter);
+app.use(["/api/v1/sections", "/v1/sections"], sectionRouter);
 
 
 // Attendance Routes
-app.use("/api/v1/attendance", attendanceRouter);
+app.use(["/api/v1/attendance", "/v1/attendance"], attendanceRouter);
 
 
 // Exam Routes
-app.use("/api/v1/exams", examRouter);
+app.use(["/api/v1/exams", "/v1/exams"], examRouter);
 
 // Fee Routes
-app.use('/api/v1/fees', feeRouter);
+app.use(['/api/v1/fees', '/v1/fees'], feeRouter);
 
 
 app.get('/test', (req, res) => {
