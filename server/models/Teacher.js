@@ -9,7 +9,7 @@ const teacherSchema = new mongoose.Schema(
       unique: true, 
       uppercase: true,
       trim: true
-    }, // Auto-generated: "TCH-2025-001"
+    }, // Auto-generated: "225001"
 
     name: { 
       type: String, 
@@ -41,12 +41,11 @@ const teacherSchema = new mongoose.Schema(
     password: { type: String, select: false },
 
     // 🎓 Professional Info
-    qualification: { type: String }, // e.g. "M.Sc Mathematics"
-    experience: { type: Number },    // Years of experience
+    qualification: { type: String },
+    experience: { type: Number },
     
     mainSubject: { type: String },
-    // What can they teach? (Crucial for TimeTable)
-    subjects: [{ type: String }],    // ["Mathematics", "Physics"]
+    subjects: [{ type: String }],
     
     // 🏫 Responsibility
     classTeacherOf: { 
@@ -54,9 +53,9 @@ const teacherSchema = new mongoose.Schema(
       ref: "Section" 
     },
 
-    bankDetailsUrl: { type: String, select: false }, // Hidden from normal queries
+    bankDetailsUrl: { type: String, select: false },
 
-    // 📅 HR Details (Simplified)
+    // 📅 HR Details
     joiningDate: { type: Date, default: Date.now },
     salary: { type: Number, select: false }, 
     address: String,
@@ -65,7 +64,7 @@ const teacherSchema = new mongoose.Schema(
 
     role: {
       type: String,
-      default: "TEACHER" // This ensures req.user.role === "TEACHER" works
+      default: "TEACHER"
     },
 
     status: {
@@ -78,26 +77,30 @@ const teacherSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
-// 🆔 Auto-generate Teacher ID
+// 🆔 Auto-generate Teacher ID: 225001, 225002, etc.
 teacherSchema.pre("save", async function (next) {
-  if (this.isNew && !this.teacherId) {
-    const currentYear = new Date().getFullYear();
-    
-    // Find the last teacher created this year
-    const lastTeacher = await mongoose.model("Teacher")
-      .findOne({ teacherId: new RegExp(`^TCH-${currentYear}-`) })
-      .sort({ teacherId: -1 })
-      .select("teacherId");
+  if (this.teacherId) return next(); // Skip if already exists
 
-    let nextNumber = 1;
-    if (lastTeacher) {
-      const lastNumber = parseInt(lastTeacher.teacherId.split("-")[2]);
-      nextNumber = lastNumber + 1;
-    }
+  const prefix = "2"; // Constant
+  const year = new Date().getFullYear().toString().slice(-2); // "25"
 
-    // Format: TCH-2025-001
-    this.teacherId = `TCH-${currentYear}-${String(nextNumber).padStart(3, "0")}`;
+  // Find last teacher with this year pattern
+  const lastTeacher = await mongoose.model("Teacher")
+    .findOne({ teacherId: new RegExp(`^${prefix}${year}`) })
+    .sort({ teacherId: -1 })
+    .lean();
+
+  let newIncrement = 1;
+
+  if (lastTeacher) {
+    const lastNo = lastTeacher.teacherId;
+    const lastInc = parseInt(lastNo.slice(3)); // Skip "2" + "25"
+    newIncrement = lastInc + 1;
   }
+
+  const padded = String(newIncrement).padStart(3, "0"); // 001, 002, 003
+  this.teacherId = `${prefix}${year}${padded}`; // 225001
+
   next();
 });
 

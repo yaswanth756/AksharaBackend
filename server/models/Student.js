@@ -1,5 +1,19 @@
 import mongoose from "mongoose";
 
+// ---------------------------------------------
+// COUNTER COLLECTION (for atomic increments)
+// ---------------------------------------------
+const counterSchema = new mongoose.Schema({
+  _id: { type: String, required: true },
+  year: String,
+  seq: { type: Number, default: 0 }
+});
+
+const Counter = mongoose.model("Counter", counterSchema);
+
+// ---------------------------------------------
+// STUDENT SCHEMA
+// ---------------------------------------------
 const studentSchema = new mongoose.Schema(
   {
     admissionNo: {
@@ -36,36 +50,27 @@ const studentSchema = new mongoose.Schema(
 );
 
 // ---------------------------------------------
-// AUTO-GENERATE ADMISSION NUMBER
+// AUTO-GENERATE ADMISSION NUMBER (ATOMIC)
 // ---------------------------------------------
 studentSchema.pre("save", async function (next) {
   if (this.admissionNo) return next(); // already exists → skip
 
-  const prefix = "1"; // constant
-  const year = new Date().getFullYear().toString().slice(-2); // last 2 digits of year
+  const prefix = "1";
+  const year = new Date().getFullYear().toString().slice(-2);
+  const counterId = `admission_${year}`; // "admission_25"
 
-  // find last student admission number for current year
-  const lastStudent = await mongoose
-    .model("Student")
-    .findOne({ admissionNo: new RegExp(`^${prefix}${year}`) })
-    .sort({ admissionNo: -1 })
-    .lean();
+  // Atomic increment - MongoDB locks, increments, returns in one operation
+  const counter = await Counter.findByIdAndUpdate(
+    counterId,
+    { $inc: { seq: 1 }, year }, // $inc is atomic - prevents race conditions
+    { new: true, upsert: true } // return updated doc, create if not exists
+  );
 
-  let newIncrement = 1;
-
-  if (lastStudent) {
-    const lastNo = lastStudent.admissionNo;
-    const lastInc = parseInt(lastNo.slice(3)); // skip prefix & year
-    newIncrement = lastInc + 1;
-  }
-
-  const padded = String(newIncrement).padStart(4, "0"); // → 0001, 0002, 0264
-
-  this.admissionNo = `${prefix}${year}${padded}`;
+  const padded = String(counter.seq).padStart(3, "0"); // 001, 002, 003...
+  this.admissionNo = `${prefix}${year}${padded}`; // 125001, 125002...
 
   next();
 });
-
 
 // Unique Roll No (year+class+section)
 studentSchema.index(
