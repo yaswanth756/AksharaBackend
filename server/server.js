@@ -34,7 +34,7 @@ const limiter = rateLimit({
 app.use(limiter);
 
 app.use(cors({
-  origin: 'https://akshara-academia-ubzk-dmowr7gu4.vercel.app/',
+  origin: 'https://aksharaschool.vercel.app',
   origin: 'http://localhost:3000',
   credentials: true,
 }));
