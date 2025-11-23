@@ -34,6 +34,7 @@ const limiter = rateLimit({
 app.use(limiter);
 
 app.use(cors({
+  origin: 'https://akshara-backend-p7oln33af.vercel.app',
   origin: 'http://localhost:3000',
   credentials: true,
 }));
