@@ -21,6 +21,9 @@ import { seedFullDatabase } from './utils/seedData.js';
 const app = express();
 dotenv.config();
 
+app.use(cors());
+app.use(express.json());
+
 // Middleware
 app.use(helmet());
 app.use(compression());
@@ -33,16 +36,9 @@ const limiter = rateLimit({
 });
 app.use(limiter);
 
-const corsOptions = {
-  origin: ['https://aksharaschool.vercel.app', 'http://localhost:3000'],
-  credentials: true,
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept', 'Origin'],
-};
 
-app.use(cors(corsOptions));
-app.options('*', cors(corsOptions));
-app.use(express.json());
+
+
 
 const PORT = process.env.PORT;
 
