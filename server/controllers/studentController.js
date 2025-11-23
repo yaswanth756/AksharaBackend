@@ -1,7 +1,9 @@
 import mongoose from "mongoose";
 import Student from "../models/Student.js";
 import Parent from "../models/Parent.js";
-
+import StudentFee from "../models/StudentFee.js";
+import Attendance from "../models/Attendance.js";
+import ExamResult from "../models/ExamResult.js";
 import { catchAsync } from "../utils/catchAsync.js";
 import { AppError } from "../utils/appError.js";
 import { shortCache } from "../utils/cache.js";
@@ -298,31 +300,101 @@ export const getStudentStats = catchAsync(async (req, res, next) => {
 /* ============================================
    5. UPDATE STUDENT (Correct/Add Details)
    ============================================ */
+/* ============================================
+ * UPDATE STUDENT (with Parent Details)
+ * ============================================ */
 export const updateStudent = catchAsync(async (req, res, next) => {
   const { id } = req.params;
 
+  // Block sensitive fields from being updated
   if (req.body.admissionNo || req.body.balance || req.body.academicYear) {
-    // Block sensitive fields from being updated here
     return next(new AppError("Cannot update sensitive fields from this route", 400));
   }
 
-  const student = await Student.findByIdAndUpdate(id, req.body, {
-    new: true,
-    runValidators: true
-  });
+  // Separate parent fields from student fields
+  const parentFields = [
+    'fatherName',
+    'motherName',
+    'email',
+    'fatherOccupation',
+    'motherOccupation',
+    'address'
+  ];
 
-  if (!student) {
-    return next(new AppError("No student found with that ID", 404));
-  }
+  const parentData = {};
+  const studentData = { ...req.body };
 
-  res.status(200).json({
-    status: "success",
-    message: "Student details updated successfully",
-    data: {
-      student
+  // Extract parent fields from request body
+  parentFields.forEach(field => {
+    if (req.body[field] !== undefined) {
+      parentData[field] = req.body[field];
+      delete studentData[field]; // Remove from student data
     }
   });
+
+  // Start a MongoDB session for transaction
+  const session = await mongoose.startSession();
+  session.startTransaction();
+
+  try {
+    // 1️⃣ Update Student document
+    const student = await Student.findByIdAndUpdate(
+      id,
+      studentData,
+      {
+        new: true,
+        runValidators: true,
+        session // Use transaction session
+      }
+    );
+
+    if (!student) {
+      await session.abortTransaction();
+      return next(new AppError("No student found with that ID", 404));
+    }
+
+    // 2️⃣ Update Parent document (if parent data exists)
+    let updatedParent = null;
+    if (Object.keys(parentData).length > 0 && student.parent) {
+      updatedParent = await Parent.findByIdAndUpdate(
+        student.parent, // Parent reference from student
+        parentData,
+        {
+          new: true,
+          runValidators: true,
+          session // Use same transaction session
+        }
+      );
+
+      if (!updatedParent) {
+        await session.abortTransaction();
+        return next(new AppError("Parent record not found", 404));
+      }
+    }
+
+    // Commit transaction if both updates succeed
+    await session.commitTransaction();
+
+    // Populate parent details for response
+    await student.populate('parent');
+
+    res.status(200).json({
+      status: "success",
+      message: "Student and parent details updated successfully",
+      data: {
+        student
+      }
+    });
+
+  } catch (error) {
+    // Rollback on any error
+    await session.abortTransaction();
+    return next(new AppError(`Update failed: ${error.message}`, 500));
+  } finally {
+    session.endSession();
+  }
 });
+
 
 /* ============================================
    6. GET SINGLE STUDENT (For Profile/Edit Page)
@@ -341,5 +413,140 @@ export const getStudent = catchAsync(async (req, res, next) => {
   res.status(200).json({
     status: "success",
     data: { student }
+  });
+});
+
+
+
+
+export const getStudentProfile = catchAsync(async (req, res, next) => {
+  const { id } = req.params; 
+  const { yearId } = req.query;
+
+  // 1. Validate ID
+  if (!mongoose.Types.ObjectId.isValid(id)) {
+    return next(new AppError("Invalid Student ID format", 400));
+  }
+  const studentObjectId = new mongoose.Types.ObjectId(id);
+
+  // 2. Fetch Student
+  const student = await Student.findById(id)
+    .populate("parent")
+    .populate("classLevel", "name")
+    .populate("section", "name")
+    .populate("academicYear", "name");
+
+  if (!student) {
+    return next(new AppError("Student not found", 404));
+  }
+
+  const currentYearId = yearId 
+    ? new mongoose.Types.ObjectId(yearId) 
+    : student.academicYear?._id;
+
+  // 3. Fetch Fee Ledger
+  const feePromise = StudentFee.findOne({ 
+    student: id, 
+    academicYear: currentYearId 
+  }).sort("-createdAt");
+
+  // 4. Fetch Attendance Stats (Aggregation)
+  // 🛠️ FIX: Removed strict 'academicYear' check if yearId is not passed.
+  // This ensures we find attendance even if Year ID is mismatched in DB.
+  const matchStage = {
+    userId: studentObjectId,
+    userType: "STUDENT"
+  };
+
+  // Only filter by year if explicitly asked, OR if you want strictly current year data.
+  // For profile view, showing ALL time attendance is often better if data is sparse.
+  // But if you want strictly this year, uncomment the next line:
+  // matchStage.academicYear = currentYearId; 
+
+  const attendancePromise = Attendance.aggregate([
+    { $match: matchStage },
+    {
+      $group: {
+        _id: "$userId",
+        totalPresent: { $sum: "$stats.present" },
+        totalAbsent: { $sum: "$stats.absent" },
+        totalLate: { $sum: "$stats.late" },
+        totalLeaves: { $sum: "$stats.leaves" }
+      }
+    }
+  ]);
+
+  // 5. Fetch Exam Results
+  const examsPromise = ExamResult.find({
+    student: id,
+    academicYear: currentYearId
+  })
+  .populate("exam", "name status")
+  .sort("-createdAt");
+
+  // 🚀 EXECUTE PARALLEL
+  const [feeLedger, attendanceStats, examResults] = await Promise.all([
+    feePromise,
+    attendancePromise,
+    examsPromise
+  ]);
+
+  // --- FORMAT RESPONSE ---
+  const att = attendanceStats[0] || { totalPresent: 0, totalAbsent: 0, totalLate: 0, totalLeaves: 0 };
+  const totalDays = att.totalPresent + att.totalAbsent + att.totalLate + att.totalLeaves;
+  const attendancePercentage = totalDays > 0 
+    ? Math.round((att.totalPresent / totalDays) * 100) 
+    : 0;
+
+  const examSummary = examResults.map(r => ({
+    examId: r.exam?._id,
+    examName: r.exam?.name || "Unknown Exam",
+    percentage: r.percentage?.toFixed(2) || "0",
+    overallResult: r.resultStatus,
+    rank: r.rank || "N/A",
+    subjects: r.marks.map(m => ({
+      name: m.subjectName,
+      obtained: m.obtainedMarks,
+      max: m.totalMarks,
+      grade: m.grade,
+      status: m.status
+    }))
+  }));
+
+  res.status(200).json({
+    status: "success",
+    data: {
+      profile: {
+        id: student._id,
+        admissionNo: student.admissionNo,
+        name: `${student.firstName} ${student.lastName || ""}`,
+        photo: student.photoUrl,
+        class: `${student.classLevel?.name || ""} - ${student.section?.name || ""}`,
+        rollNo: student.rollNo,
+        status: student.status,
+        dob: student.dob,
+        gender: student.gender
+      },
+      parent: {
+        name: student.parent?.fatherName,
+        phone: student.parent?.primaryPhone,
+        email: student.parent?.email
+      },
+      feeSummary: {
+        status: feeLedger?.status || "N/A",
+        totalAmount: feeLedger?.finalAmount || 0,
+        paidAmount: feeLedger?.paidAmount || 0,
+        dueAmount: feeLedger?.dueAmount || 0,
+        currency: "INR"
+      },
+      attendance: {
+        percentage: attendancePercentage,
+        present: att.totalPresent,
+        absent: att.totalAbsent,
+        late: att.totalLate,
+        leaves: att.totalLeaves
+      },
+      exams: examSummary
+    }
   });
 });

@@ -3,7 +3,8 @@ import {
   markAttendance, 
   getMonthlyReport,
   getDailyStatus,
-  getDailyReport
+  getDailyReport,
+  debugAttendance
 } from "../controllers/attendanceController.js";
 import { protect, restrictTo } from "../middleware/authMiddleware.js";
 
@@ -23,5 +24,8 @@ router.get("/daily-status", restrictTo("ADMIN", "OPERATOR", "TEACHER"), getDaily
 // --- REPORTS ---
 router.get("/monthly", restrictTo("ADMIN", "OPERATOR", "TEACHER"), getMonthlyReport);
 router.get("/daily-report", restrictTo("ADMIN", "OPERATOR"), getDailyReport);
+
+
+router.get("/debug/:studentId", debugAttendance);
 
 export default router;

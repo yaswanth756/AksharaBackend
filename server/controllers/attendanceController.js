@@ -144,7 +144,8 @@ export const getMonthlyReport = catchAsync(async (req, res, next) => {
 
   const attendanceData = await Attendance.find(filter)
     .populate("userId", "name firstName lastName rollNo")
-    .sort("userId");
+    .sort("userId")
+    .lean();
 
   const responseData = { attendanceData };
   shortCache.set(cacheKey, responseData);
@@ -226,7 +227,8 @@ export const getDailyReport = catchAsync(async (req, res, next) => {
     .populate("userId", "firstName lastName admissionNo name phone rollNo teacherId")
     .populate("section", "name")
     .populate("classLevel", "name")
-    .populate("records.markedBy", "name");
+    .populate("records.markedBy", "name")
+    .lean();
 
   // Extract day's data
   const dailyData = attendanceDocs.map((doc) => {
@@ -305,3 +307,18 @@ export const getDailyReport = catchAsync(async (req, res, next) => {
   });
 });
 
+/* ============================================
+   DEBUGGING TOOL: INSPECT ATTENDANCE
+   ============================================ */
+export const debugAttendance = catchAsync(async (req, res, next) => {
+  const { studentId } = req.params;
+
+  // 1. Find ALL attendance records for this student, regardless of year
+  const docs = await Attendance.find({ userId: studentId });
+
+  res.status(200).json({
+    status: "success",
+    results: docs.length,
+    data: docs // This will show us the 'academicYear' field inside the doc
+  });
+});

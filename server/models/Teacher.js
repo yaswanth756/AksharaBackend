@@ -58,7 +58,7 @@ const teacherSchema = new mongoose.Schema(
 
     // 📅 HR Details (Simplified)
     joiningDate: { type: Date, default: Date.now },
-    salary: { type: Number, select: false }, // Hidden from normal queries
+    salary: { type: Number, select: false }, 
     address: String,
     photoUrl: String,
     perviousSchool: String,

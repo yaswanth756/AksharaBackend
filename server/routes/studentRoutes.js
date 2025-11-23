@@ -5,7 +5,8 @@ import {
   searchStudents,   
   getStudentStats,
   getStudent, 
-  updateStudent 
+  updateStudent ,
+  getStudentProfile
 } from "../controllers/studentController.js";
 import { protect, restrictTo } from "../middleware/authMiddleware.js";
 
@@ -22,6 +23,7 @@ router.get("/stats", restrictTo("ADMIN,", "OPERATOR"), getStudentStats); // /api
 router.post("/admit", restrictTo("ADMIN", "OPERATOR"), admitStudent);
 router.get("/", restrictTo("ADMIN", "OPERATOR", "TEACHER"), getAllStudents);
 
+router.get("/:id/profile", restrictTo("ADMIN", "OPERATOR", "TEACHER"), getStudentProfile);
 
 router
   .route("/:id")

@@ -18,7 +18,7 @@ export const createTeacher = catchAsync(async (req, res, next) => {
   const { 
     name, phone, email, gender, 
     qualification, subjects, mainSubject, experience,
-    bankDetailsUrl, address, photoUrl, perviousSchool,
+    bankDetailsUrl, address, photoUrl, perviousSchool,salary,
     dob, section_id
   } = req.body;
 
@@ -37,7 +37,7 @@ export const createTeacher = catchAsync(async (req, res, next) => {
 
   const newTeacher = await Teacher.create({
     name, phone, email, gender, qualification, subjects, mainSubject,
-    experience, bankDetailsUrl, address, photoUrl, perviousSchool, dob, classTeacherOf
+    experience, bankDetailsUrl, address, photoUrl, perviousSchool, dob, classTeacherOf, salary
   });
 
   const { password, bankDetailsUrl: _, salary: __, ...teacherData } = newTeacher.toObject();
@@ -138,7 +138,7 @@ export const getAllTeachers = catchAsync(async (req, res, next) => {
     const { id } = req.params;
     const { 
       name, phone, email, gender, qualification, subjects, mainSubject,
-      experience, bankDetailsUrl, address, photoUrl, perviousSchool, dob, section_id, status
+      experience, bankDetailsUrl, address, photoUrl, perviousSchool, dob, section_id, status,salary
     } = req.body;
   
     const teacher = await Teacher.findById(id);
@@ -185,7 +185,7 @@ export const getAllTeachers = catchAsync(async (req, res, next) => {
   
     const updateData = {
       name, phone, email, gender, qualification, subjects, mainSubject,
-      experience, bankDetailsUrl, address, photoUrl, perviousSchool, dob, classTeacherOf, status
+      experience, bankDetailsUrl, address, photoUrl, perviousSchool, dob, classTeacherOf, status,salary
     };
   
     Object.keys(updateData).forEach(key => {

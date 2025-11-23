@@ -2,7 +2,9 @@ import mongoose from "mongoose";
 import StudentFee from "../models/StudentFee.js";
 import Student from "../models/Student.js";
 import FeePayment from "../models/FeePayment.js";
-
+import FeeStructure from "../models/FeeStructure.js";
+import ClassLevel from "../models/ClassLevel.js";
+import Section from "../models/Section.js";
 import { catchAsync } from "../utils/catchAsync.js";
 import { AppError } from "../utils/appError.js";
 import { shortCache } from "../utils/cache.js";
@@ -274,3 +276,74 @@ export const getDashboardStats = catchAsync(async (req, res, next) => {
   });
 });
 
+
+
+/* ============================================
+   5. GET COMPREHENSIVE COLLECTION REPORT
+   ============================================ */
+ /* ============================================
+   5. GET COMPREHENSIVE COLLECTION REPORT
+   ============================================ */
+export const getComprehensiveReport = catchAsync(async (req, res, next) => {
+  const { classId, sectionId, status } = req.query;
+
+  // Build filter for StudentFee
+  const filter = {};
+  if (status) filter.status = status;
+
+  // Fetch all student fee records with populated student data
+  let studentFees = await StudentFee.find(filter)
+    .populate({
+      path: 'student',
+      select: 'firstName lastName admissionNo photoUrl classLevel section',
+      populate: [
+        { path: 'classLevel', select: 'name' },
+        { path: 'section', select: 'name' }
+      ]
+    })
+    .sort('-createdAt');
+
+  // Filter by class and section (from populated student data)
+  if (classId) {
+    studentFees = studentFees.filter(fee => 
+      fee.student?.classLevel?._id?.toString() === classId
+    );
+  }
+  
+  if (sectionId) {
+    studentFees = studentFees.filter(fee => 
+      fee.student?.section?._id?.toString() === sectionId
+    );
+  }
+
+  // Calculate summary stats
+  const summary = {
+    totalStudents: studentFees.length,
+    totalAmount: 0,
+    totalPaid: 0,
+    totalDue: 0,
+    totalConcession: 0,
+    paidCount: 0,
+    partialCount: 0,
+    pendingCount: 0
+  };
+
+  studentFees.forEach(fee => {
+    summary.totalAmount += fee.totalAmount || 0;
+    summary.totalPaid += fee.paidAmount || 0;
+    summary.totalDue += fee.dueAmount || 0;
+    summary.totalConcession += fee.concessionAmount || 0;
+
+    if (fee.status === 'PAID') summary.paidCount++;
+    else if (fee.status === 'PARTIAL') summary.partialCount++;
+    else if (fee.status === 'PENDING') summary.pendingCount++;
+  });
+
+  res.status(200).json({
+    status: "success",
+    data: {
+      summary,
+      students: studentFees
+    }
+  });
+});

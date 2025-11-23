@@ -13,7 +13,8 @@ import {
   applyConcession, 
   getDefaultersReport ,
   getStudentFeeLedgerByNameOrAdmission,
-  getDashboardStats
+  getDashboardStats,
+  getComprehensiveReport
 } from "../controllers/studentFeeController.js";
 import { protect, restrictTo } from "../middleware/authMiddleware.js";
 
@@ -36,4 +37,7 @@ router.get("/ledger/:studentId", getStudentFeeLedger);
 router.post("/ledger/concession/:ledgerId", restrictTo("ADMIN"), applyConcession);
 router.get("/reports/defaulters", restrictTo("ADMIN"), getDefaultersReport);
 router.get("/dashboard/stats", restrictTo("ADMIN", "OPERATOR"), getDashboardStats);
+// --- Comprehensive Report ---
+router.get("/reports/comprehensive", restrictTo("ADMIN"), getComprehensiveReport);
+
 export default router;
