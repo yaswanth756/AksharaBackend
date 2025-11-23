@@ -8,7 +8,7 @@ const MONGODB_URI = process.env.MONGODB_URI
 
 export const connectDB = async () => {
   try {
-  
+
     await mongoose.connect(MONGODB_URI);
     console.log("MongoDB Connected Successfully")
     //seedFullDatabase();
@@ -16,7 +16,7 @@ export const connectDB = async () => {
 
   } catch (error) {
     console.error("MongoDB Connection Error:", error)
-    process.exit(1)
+    // process.exit(1) // Removed to prevent serverless function crash
   }
 }
 
