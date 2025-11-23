@@ -17,6 +17,7 @@ import attendanceRouter from "./routes/attendanceRoutes.js";
 import examRouter from "./routes/examRoutes.js";
 import feeRouter from './routes/feeRoutes.js';
 import { seedFullDatabase } from './utils/seedData.js';
+import { globalErrorHandler } from './controllers/errorController.js';
 
 const app = express();
 dotenv.config();
@@ -87,6 +88,9 @@ app.use('/api/v1/fees', feeRouter);
 app.get('/test', (req, res) => {
   res.send('Hello World!');
 });
+
+// Global Error Handler
+app.use(globalErrorHandler);
 
 if (process.env.NODE_ENV !== 'production') {
   app.listen(PORT, () => {
